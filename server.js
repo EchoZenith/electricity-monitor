@@ -54,6 +54,14 @@ if (!WECOM_WEBHOOK_URL) {
   console.warn('警告: 环境变量 WECOM_WEBHOOK_URL 未设置，企业微信通知功能将不可用');
 }
 
+const ALERT_THRESHOLD = parseFloat(process.env.ALERT_THRESHOLD) || 0;
+
+if (ALERT_THRESHOLD > 0) {
+  console.log(`电费预警: 当余额低于 ¥${ALERT_THRESHOLD} 时将发送企业微信通知`);
+}
+
+let lastAlertedAmount = null;
+
 function requireAuth(req, res, next) {
   const auth = req.signedCookies.auth;
   if (auth === LOGIN_USERNAME) {
@@ -163,12 +171,30 @@ async function collectData() {
     if (sameDay && sameHour) {
       updateStmt.run(data.surplus, data.amount, data.timestamp, latest.id);
       console.log(`[${new Date().toLocaleString()}] 更新本小时记录: ${data.surplus}度, ¥${data.amount}`);
+      await checkThresholdAndAlert(data.amount);
       return;
     }
   }
 
   insertStmt.run(data.surplus, data.amount, data.timestamp, data.roomName);
   console.log(`[${new Date().toLocaleString()}] 新增记录: ${data.surplus}度, ¥${data.amount}`);
+  await checkThresholdAndAlert(data.amount);
+}
+
+async function checkThresholdAndAlert(amount) {
+  if (ALERT_THRESHOLD <= 0 || amount > ALERT_THRESHOLD) {
+    lastAlertedAmount = null;
+    return;
+  }
+  if (lastAlertedAmount !== null && amount >= lastAlertedAmount) return;
+  lastAlertedAmount = amount;
+  console.log(`[预警] 余额 ¥${amount} 低于阈值 ¥${ALERT_THRESHOLD}`);
+  await sendWecomNotification(
+    '## 电费余额预警\n\n' +
+    `> 时间：${new Date().toLocaleString('zh-CN')}\n\n` +
+    `当前余额 **¥${amount.toFixed(2)}**\n\n` +
+    `已低于预警阈值 **¥${ALERT_THRESHOLD.toFixed(2)}**，请及时充值！`
+  );
 }
 
 function calculateDailyUsage(records) {
