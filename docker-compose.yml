@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  electricity-monitor:
+    build: .
+    container_name: electricity-monitor
+    user: root
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - TZ=Asia/Shanghai
