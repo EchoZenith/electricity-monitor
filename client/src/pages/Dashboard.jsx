@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Spin, message } from 'antd';
 import { LogoutOutlined, ReloadOutlined } from '@ant-design/icons';
+import { BugOutlined } from '@ant-design/icons';
 import { Lightning, ChartLine, ChartHistogram, Timer } from '@icon-park/react';
 import { Chart, registerables } from 'chart.js';
 import { fetchCurrent, fetchHistory, triggerCollect, logout } from '../api';
@@ -9,8 +10,8 @@ Chart.register(...registerables);
 
 const styles = `
 @media (max-width: 640px) {
-  .d-header { flex-direction: column !important; gap: 12px !important; }
-  .d-stats { grid-template-columns: 1fr !important; gap: 12px !important; }
+   .d-header { flex-direction: column !important; gap: 12px !important; }
+   .d-stats { grid-template-columns: 1fr !important; gap: 12px !important; }
   .d-stats-card { padding: 16px !important; }
   .d-stats-value { font-size: 28px !important; }
   .d-bottom { grid-template-columns: 1fr !important; gap: 12px !important; }
@@ -79,6 +80,20 @@ export default function Dashboard({ onLogout }) {
   const handleLogout = async () => {
     await logout();
     onLogout();
+  };
+
+  const handleTestNotify = async () => {
+    try {
+      const res = await fetch('/api/test-notify');
+      const data = await res.json();
+      if (data.success) {
+        message.success('测试消息已发送，请查看企业微信');
+      } else {
+        message.error('发送失败');
+      }
+    } catch {
+      message.error('发送失败');
+    }
   };
 
   useEffect(() => {
@@ -276,6 +291,7 @@ export default function Dashboard({ onLogout }) {
   const estimatedDays = stats[`estimatedDays${statKey}`];
 
   const todayUsage = currentData?.todayUsage ?? 0;
+  const todayCost = currentData?.todayCost ?? 0;
   const todayAvgPower = currentData?.todayAvgPower ?? null;
 
   return (
@@ -306,6 +322,19 @@ body { margin: 0; }
               手动获取
             </Button>
             <Button
+              icon={<BugOutlined />}
+              onClick={handleTestNotify}
+              size="small"
+              style={{
+                border: '1px solid #d9d9d9',
+                borderRadius: 20,
+                color: '#666',
+                fontSize: 13,
+              }}
+            >
+              测试通知
+            </Button>
+            <Button
               icon={<LogoutOutlined />}
               onClick={handleLogout}
               size="small"
@@ -321,7 +350,7 @@ body { margin: 0; }
           </div>
         </div>
 
-        <div className="d-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 32 }}>
+        <div className="d-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, marginBottom: 32 }}>
           <div className="d-stats-card" style={{ padding: 20 }}>
             <div style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>剩余电量</div>
             <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: '#1a1a1a', display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -340,6 +369,12 @@ body { margin: 0; }
             <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: '#1a1a1a', display: 'flex', alignItems: 'baseline', gap: 6 }}>
               {todayUsage.toFixed(1)}
               <span style={{ fontSize: 16, fontWeight: 400, color: '#999' }}>kWh</span>
+            </div>
+          </div>
+          <div className="d-stats-card" style={{ padding: 20 }}>
+            <div style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>今日电费</div>
+            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: '#1a1a1a' }}>
+              ¥{todayCost.toFixed(2)}
             </div>
           </div>
         </div>

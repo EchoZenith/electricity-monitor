@@ -71,14 +71,6 @@ function getAllRecords() {
   return db.prepare('SELECT * FROM records ORDER BY timestamp ASC').all();
 }
 
-function getTodayRecords() {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  return db.prepare(
-    'SELECT * FROM records WHERE timestamp >= ? ORDER BY timestamp ASC'
-  ).all(todayStart.getTime());
-}
-
 async function sendWecomNotification(content) {
   if (!WECOM_WEBHOOK_URL) return;
   try {
@@ -90,8 +82,9 @@ async function sendWecomNotification(content) {
         markdown: { content }
       })
     });
-    if (!res.ok) {
-      console.error(`企业微信通知发送失败: ${res.status}`);
+    const body = await res.json();
+    if (body.errcode !== 0) {
+      console.error(`企业微信通知发送失败: errcode=${body.errcode}, errmsg=${body.errmsg}`);
     }
   } catch (err) {
     console.error('企业微信通知发送失败:', err.message);
@@ -179,7 +172,7 @@ async function collectData() {
 }
 
 function calculateDailyUsage(records) {
-  if (records.length < 2) return { dailyUsage: 0, todayUsage: 0, dailyRecords: [] };
+  if (records.length < 2) return { dailyUsage: 0, todayUsage: 0, todayCost: 0, dailyRecords: [] };
 
   const dailyMap = {};
 
@@ -193,13 +186,15 @@ function calculateDailyUsage(records) {
 
   const dailyRecords = [];
   const sortedDates = Object.keys(dailyMap).sort();
+  let prevLastSurplus = null;
 
   for (let i = 0; i < sortedDates.length; i++) {
     const date = sortedDates[i];
     const dayRecords = dailyMap[date].sort((a, b) => a.timestamp - b.timestamp);
     const firstSurplus = dayRecords[0].surplus;
     const lastSurplus = dayRecords[dayRecords.length - 1].surplus;
-    const usage = Math.round(Math.max(0, firstSurplus - lastSurplus) * 100) / 100;
+    const base = prevLastSurplus !== null ? prevLastSurplus : firstSurplus;
+    const usage = Math.round(Math.max(0, base - lastSurplus) * 100) / 100;
 
     const hoursSpan = (dayRecords[dayRecords.length - 1].timestamp - dayRecords[0].timestamp) / (1000 * 60 * 60);
     const avgPower = hoursSpan > 0 ? Math.round((usage / hoursSpan) * 1000) / 1000 : 0;
@@ -208,22 +203,16 @@ function calculateDailyUsage(records) {
       date,
       usage,
       avgPower,
-      firstSurplus,
+      firstSurplus: base,
       lastSurplus,
       recordCount: dayRecords.length,
       hoursSpan,
     });
+
+    prevLastSurplus = lastSurplus;
   }
 
-  const today = getLocalDateStr(new Date());
-  const todayRecords = dailyMap[today];
-  let todayUsage = 0;
-  if (todayRecords && todayRecords.length >= 2) {
-    const sorted = todayRecords.sort((a, b) => a.timestamp - b.timestamp);
-    todayUsage = Math.max(0, Math.round((sorted[0].surplus - sorted[sorted.length - 1].surplus) * 100) / 100);
-  }
-
-  return { dailyUsage: todayUsage, todayUsage, dailyRecords };
+  return { dailyUsage: 0, todayUsage: 0, todayCost: 0, dailyRecords };
 }
 
 const CLIENT_DIR = path.join(__dirname, 'client', 'dist');
@@ -263,20 +252,32 @@ app.get('/api/current', requireAuth, (req, res) => {
     return res.json({ success: false, message: '暂无数据' });
   }
   const latest = allRecords[allRecords.length - 1];
-  const { dailyUsage } = calculateDailyUsage(allRecords);
-  const todayRecords = getTodayRecords();
 
+  const todayStr = getLocalDateStr(new Date());
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayRecords = getRecordsByDate(getLocalDateStr(yesterday));
+  const yesterdayStr = getLocalDateStr(yesterday);
+
+  const todayRecordsDB = getRecordsByDate(todayStr);
+  const yesterdayRecords = getRecordsByDate(yesterdayStr);
   const yesterdayLast = yesterdayRecords.length > 0 ? yesterdayRecords[yesterdayRecords.length - 1] : null;
+  const sortedToday = [...todayRecordsDB].sort((a, b) => a.timestamp - b.timestamp);
+
+  let todayUsage = 0;
+  let todayCost = 0;
+  if (sortedToday.length >= 1) {
+    const base = yesterdayLast || sortedToday[0];
+    todayUsage = Math.max(0, Math.round((base.surplus - sortedToday[sortedToday.length - 1].surplus) * 100) / 100);
+    todayCost = Math.max(0, Math.round((base.amount - sortedToday[sortedToday.length - 1].amount) * 100) / 100);
+  }
 
   res.json({
     success: true,
     current: latest,
-    todayUsage: dailyUsage,
-    todayAvgPower: dailyUsage > 0 ? Math.round((dailyUsage / Math.max(1, new Date().getHours())) * 1000) / 1000 : 0,
-    todayRecords,
+    todayUsage,
+    todayCost,
+    todayAvgPower: todayUsage > 0 ? Math.round((todayUsage / Math.max(1, new Date().getHours())) * 1000) / 1000 : 0,
+    todayRecords: sortedToday,
     yesterdayLastRecord: yesterdayLast,
     totalRecords: allRecords.length
   });
@@ -287,17 +288,20 @@ app.get('/api/history', requireAuth, (req, res) => {
   const { dailyRecords } = calculateDailyUsage(allRecords);
   const latest = allRecords.length > 0 ? allRecords[allRecords.length - 1] : null;
 
-  const totalUsageLast7Days = dailyRecords.slice(-7).reduce((sum, d) => sum + d.usage, 0);
-  const totalUsageLast15Days = dailyRecords.slice(-15).reduce((sum, d) => sum + d.usage, 0);
-  const totalUsageLast30Days = dailyRecords.slice(-30).reduce((sum, d) => sum + d.usage, 0);
+  const todayStr = getLocalDateStr(new Date());
+  const historyDailyRecords = dailyRecords.filter(d => d.date !== todayStr);
 
-  const totalHours7 = dailyRecords.slice(-7).reduce((sum, d) => sum + d.hoursSpan, 0);
-  const totalHours15 = dailyRecords.slice(-15).reduce((sum, d) => sum + d.hoursSpan, 0);
-  const totalHours30 = dailyRecords.slice(-30).reduce((sum, d) => sum + d.hoursSpan, 0);
+  const totalUsageLast7Days = historyDailyRecords.slice(-7).reduce((sum, d) => sum + d.usage, 0);
+  const totalUsageLast15Days = historyDailyRecords.slice(-15).reduce((sum, d) => sum + d.usage, 0);
+  const totalUsageLast30Days = historyDailyRecords.slice(-30).reduce((sum, d) => sum + d.usage, 0);
 
-  const days7 = Math.min(7, dailyRecords.length);
-  const days15 = Math.min(15, dailyRecords.length);
-  const days30 = Math.min(30, dailyRecords.length);
+  const totalHours7 = historyDailyRecords.slice(-7).reduce((sum, d) => sum + d.hoursSpan, 0);
+  const totalHours15 = historyDailyRecords.slice(-15).reduce((sum, d) => sum + d.hoursSpan, 0);
+  const totalHours30 = historyDailyRecords.slice(-30).reduce((sum, d) => sum + d.hoursSpan, 0);
+
+  const days7 = Math.min(7, historyDailyRecords.length);
+  const days15 = Math.min(15, historyDailyRecords.length);
+  const days30 = Math.min(30, historyDailyRecords.length);
 
   const avgDaily7 = days7 >= 1 ? Math.round((totalUsageLast7Days / days7) * 100) / 100 : null;
   const avgDaily15 = days15 >= 1 ? Math.round((totalUsageLast15Days / days15) * 100) / 100 : null;
@@ -356,18 +360,28 @@ async function sendDailyReport() {
   const dateStr = getLocalDateStr(yesterday);
 
   const records = getRecordsByDate(dateStr);
-  if (records.length < 2) {
+  if (records.length < 1) {
     await sendWecomNotification(
       '## 电费日报\n\n' +
       `> 日期：${dateStr}\n\n` +
-      `数据不足，无法生成昨日用电报告（仅 ${records.length} 条记录）`
+      `昨日无数据记录`
     );
     return;
   }
 
-  const first = records[0];
-  const last = records[records.length - 1];
-  const usage = Math.round(Math.max(0, first.surplus - last.surplus) * 100) / 100;
+  const sorted = [...records].sort((a, b) => a.timestamp - b.timestamp);
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+
+  const dayBefore = new Date(yesterday);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  const dayBeforeRecords = getRecordsByDate(getLocalDateStr(dayBefore));
+  const dayBeforeLast = dayBeforeRecords.length > 0 ? dayBeforeRecords[dayBeforeRecords.length - 1] : null;
+  const baseSurplus = dayBeforeLast ? dayBeforeLast.surplus : first.surplus;
+  const baseAmount = dayBeforeLast ? dayBeforeLast.amount : first.amount;
+
+  const usage = Math.round(Math.max(0, baseSurplus - last.surplus) * 100) / 100;
+  const cost = Math.round(Math.max(0, baseAmount - last.amount) * 100) / 100;
 
   const hoursSpan = (last.timestamp - first.timestamp) / (1000 * 60 * 60);
   const avgPower = hoursSpan > 0 ? Math.round((usage / hoursSpan) * 1000) / 1000 : 0;
@@ -377,9 +391,9 @@ async function sendDailyReport() {
   let content = '## 电费日报\n\n';
   content += `> 日期：${dateStr}\n\n`;
   content += `**昨日用电**：${usage.toFixed(2)} 度\n`;
+  content += `**昨日电费**：¥${cost.toFixed(2)}\n`;
   content += `**平均功率**：${avgPower.toFixed(3)} kW\n`;
-  content += `**数据记录**：${records.length} 条\n`;
-  content += `**记录区间**：${new Date(first.timestamp).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })} ~ ${new Date(last.timestamp).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })}\n`;
+  content += `**数据记录**：${sorted.length} 条\n`;
   if (latest) {
     content += `\n**当前剩余电量**：${latest.surplus.toFixed(2)} 度\n`;
     content += `**当前剩余余额**：¥${latest.amount.toFixed(2)}\n`;
@@ -396,6 +410,15 @@ cron.schedule('0 0 * * *', async () => {
 app.get('/api/trigger-collect', requireAuth, async (req, res) => {
   await collectData();
   res.json({ success: true, message: '采集完成' });
+});
+
+app.get('/api/test-notify', requireAuth, async (req, res) => {
+  await sendWecomNotification(
+    '## 电费监控测试消息\n\n' +
+    `> 时间：${new Date().toLocaleString('zh-CN')}\n\n` +
+    '如果收到此消息，说明企业微信通知配置正常。'
+  );
+  res.json({ success: true, message: '测试消息已发送，请查看企业微信' });
 });
 
 app.get('*', (req, res) => {
