@@ -29,7 +29,7 @@ export default function Login({ onLogin }) {
       justifyContent: 'center',
       alignItems: 'center',
       minHeight: '100vh',
-      background: '#f5f7fa',
+      background: 'var(--bg-body)',
       padding: 0,
     }}>
       <Card
@@ -37,7 +37,6 @@ export default function Login({ onLogin }) {
           width: '100%',
           maxWidth: 400,
           borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
         }}
         styles={{ body: { padding: '48px 40px', textAlign: 'center' } }}
       >
@@ -47,11 +46,11 @@ export default function Login({ onLogin }) {
             margin: 0,
             fontSize: 24,
             fontWeight: 600,
-            color: '#1a1a1a',
+            color: 'var(--text-primary)',
           }}>
             智能电量监控
           </h2>
-          <p style={{ color: '#999', fontSize: 14, marginTop: 8, marginBottom: 0 }}>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: 14, marginTop: 8, marginBottom: 0 }}>
             请登录后查看用电数据
           </p>
         </div>
@@ -66,7 +65,7 @@ export default function Login({ onLogin }) {
             rules={[{ required: true, message: '请输入用户名' }]}
           >
             <Input
-              prefix={<UserOutlined style={{ color: '#999' }} />}
+              prefix={<UserOutlined style={{ color: 'var(--text-tertiary)' }} />}
               placeholder="用户名"
               size="large"
             />
@@ -77,7 +76,7 @@ export default function Login({ onLogin }) {
             rules={[{ required: true, message: '请输入密码' }]}
           >
             <Input.Password
-              prefix={<LockOutlined style={{ color: '#999' }} />}
+              prefix={<LockOutlined style={{ color: 'var(--text-tertiary)' }} />}
               placeholder="密码"
               size="large"
             />

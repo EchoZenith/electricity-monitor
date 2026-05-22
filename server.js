@@ -314,63 +314,52 @@ app.get('/api/history', requireAuth, (req, res) => {
   const { dailyRecords } = calculateDailyUsage(allRecords);
   const latest = allRecords.length > 0 ? allRecords[allRecords.length - 1] : null;
 
-  const todayStr = getLocalDateStr(new Date());
-  const historyDailyRecords = dailyRecords.filter(d => d.date !== todayStr);
+  const calcStats = (dailyRecords, n) => {
+    const records = dailyRecords.slice(-n);
+    if (records.length < 1) return { avgDaily: null, avgPower: null, estimatedDays: null };
 
-  const totalUsageLast7Days = historyDailyRecords.slice(-7).reduce((sum, d) => sum + d.usage, 0);
-  const totalUsageLast15Days = historyDailyRecords.slice(-15).reduce((sum, d) => sum + d.usage, 0);
-  const totalUsageLast30Days = historyDailyRecords.slice(-30).reduce((sum, d) => sum + d.usage, 0);
+    const todayStr = getLocalDateStr(new Date());
+    let totalUsage = 0;
+    let dayCount = 0;
 
-  const totalHours7 = historyDailyRecords.slice(-7).reduce((sum, d) => sum + d.hoursSpan, 0);
-  const totalHours15 = historyDailyRecords.slice(-15).reduce((sum, d) => sum + d.hoursSpan, 0);
-  const totalHours30 = historyDailyRecords.slice(-30).reduce((sum, d) => sum + d.hoursSpan, 0);
+    records.forEach(r => {
+      if (r.date === todayStr) {
+        const elapsed = Math.max(1, r.hoursSpan + 1);
+        const normalized = Math.round((r.usage / elapsed) * 24 * 100) / 100;
+        totalUsage += normalized;
+      } else {
+        totalUsage += r.usage;
+      }
+      dayCount++;
+    });
 
-  const days7 = Math.min(7, historyDailyRecords.length);
-  const days15 = Math.min(15, historyDailyRecords.length);
-  const days30 = Math.min(30, historyDailyRecords.length);
+    const avgDaily = Math.round((totalUsage / dayCount) * 100) / 100;
+    const avgPower = Math.round((avgDaily / 24) * 1000) / 1000;
+    const estimatedDays = avgDaily > 0 && latest
+      ? Math.round(latest.surplus / avgDaily * 10) / 10
+      : null;
 
-  const avgDaily7 = days7 >= 1 ? Math.round((totalUsageLast7Days / days7) * 100) / 100 : null;
-  const avgDaily15 = days15 >= 1 ? Math.round((totalUsageLast15Days / days15) * 100) / 100 : null;
-  const avgDaily30 = days30 >= 1 ? Math.round((totalUsageLast30Days / days30) * 100) / 100 : null;
+    return { avgDaily, avgPower, estimatedDays };
+  };
 
-  const avgPower7 = totalHours7 >= 1
-    ? Math.round((totalUsageLast7Days / totalHours7) * 1000) / 1000
-    : null;
-
-  const avgPower15 = totalHours15 >= 1
-    ? Math.round((totalUsageLast15Days / totalHours15) * 1000) / 1000
-    : null;
-
-  const avgPower30 = totalHours30 >= 1
-    ? Math.round((totalUsageLast30Days / totalHours30) * 1000) / 1000
-    : null;
-
-  const estimatedDays7 = avgDaily7 && avgDaily7 > 0 && latest
-    ? Math.round(latest.surplus / avgDaily7 * 10) / 10
-    : null;
-
-  const estimatedDays15 = avgDaily15 && avgDaily15 > 0 && latest
-    ? Math.round(latest.surplus / avgDaily15 * 10) / 10
-    : null;
-
-  const estimatedDays30 = avgDaily30 && avgDaily30 > 0 && latest
-    ? Math.round(latest.surplus / avgDaily30 * 10) / 10
-    : null;
+  const s7 = calcStats(dailyRecords, 7);
+  const s15 = calcStats(dailyRecords, 15);
+  const s30 = calcStats(dailyRecords, 30);
 
   res.json({
     success: true,
     current: latest,
     dailyRecords: dailyRecords.slice(-30),
     stats: {
-      avgDaily7,
-      avgDaily15,
-      avgDaily30,
-      avgPower7,
-      avgPower15,
-      avgPower30,
-      estimatedDays7,
-      estimatedDays15,
-      estimatedDays30
+      avgDaily7: s7.avgDaily,
+      avgDaily15: s15.avgDaily,
+      avgDaily30: s30.avgDaily,
+      avgPower7: s7.avgPower,
+      avgPower15: s15.avgPower,
+      avgPower30: s30.avgPower,
+      estimatedDays7: s7.estimatedDays,
+      estimatedDays15: s15.estimatedDays,
+      estimatedDays30: s30.estimatedDays,
     }
   });
 });

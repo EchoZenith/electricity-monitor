@@ -30,7 +30,6 @@ ENV TZ=Asia/Shanghai
 COPY --from=builder /app/node_modules ./node_modules
 COPY server.js .
 COPY --from=client-builder /app/dist ./client/dist
-COPY data ./data
 
 EXPOSE 3000
 

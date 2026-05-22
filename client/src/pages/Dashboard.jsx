@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Spin, message } from 'antd';
-import { LogoutOutlined, ReloadOutlined } from '@ant-design/icons';
-import { BugOutlined } from '@ant-design/icons';
+import { LogoutOutlined, ReloadOutlined, BugOutlined } from '@ant-design/icons';
 import { Lightning, ChartLine, ChartHistogram, Timer } from '@icon-park/react';
 import { Chart, registerables } from 'chart.js';
 import { fetchCurrent, fetchHistory, triggerCollect, logout } from '../api';
@@ -278,7 +277,7 @@ export default function Dashboard({ onLogout }) {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f7fa' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-body)' }}>
         <Spin size="large" />
       </div>
     );
@@ -288,21 +287,21 @@ export default function Dashboard({ onLogout }) {
   const stats = historyData?.stats || {};
   const statKey = days === 7 ? '7' : days === 15 ? '15' : '30';
   const avgDaily = stats[`avgDaily${statKey}`];
+  const avgPower = stats[`avgPower${statKey}`];
   const estimatedDays = stats[`estimatedDays${statKey}`];
 
   const todayUsage = currentData?.todayUsage ?? 0;
   const todayCost = currentData?.todayCost ?? 0;
-  const todayAvgPower = currentData?.todayAvgPower ?? null;
 
   return (
-    <div className="d-body" style={{ background: '#f5f7fa', minHeight: '100vh', padding: 20 }}>
+    <div className="d-body" style={{ background: 'var(--bg-body)', minHeight: '100vh', padding: 20 }}>
       <style>{`${styles}
 body { margin: 0; }
 .d-container { border-radius: 12px !important; box-shadow: none !important; }
 `}</style>
-      <div className="d-container" style={{ maxWidth: 1200, margin: '0 auto', background: 'white', padding: 32, borderRadius: 12 }}>
+      <div className="d-container" style={{ maxWidth: 1200, margin: '0 auto', background: 'var(--bg-card)', padding: 32, borderRadius: 12 }}>
         <div className="d-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 24, fontWeight: 600, color: '#1a1a1a' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>
             <Lightning theme="filled" size="28" fill="#4a90e2" style={{ display: 'flex' }} />
             智能电量监控
           </div>
@@ -313,9 +312,9 @@ body { margin: 0; }
               loading={collecting}
               size="small"
               style={{
-                border: '1px solid #d9d9d9',
+                border: '1px solid var(--border-light)',
                 borderRadius: 20,
-                color: '#666',
+                color: 'var(--text-secondary)',
                 fontSize: 13,
               }}
             >
@@ -326,9 +325,9 @@ body { margin: 0; }
               onClick={handleTestNotify}
               size="small"
               style={{
-                border: '1px solid #d9d9d9',
+                border: '1px solid var(--border-light)',
                 borderRadius: 20,
-                color: '#666',
+                color: 'var(--text-secondary)',
                 fontSize: 13,
               }}
             >
@@ -339,9 +338,9 @@ body { margin: 0; }
               onClick={handleLogout}
               size="small"
               style={{
-                border: '1px solid #d9d9d9',
+                border: '1px solid var(--border-light)',
                 borderRadius: 20,
-                color: '#666',
+                color: 'var(--text-secondary)',
                 fontSize: 13,
               }}
             >
@@ -352,28 +351,28 @@ body { margin: 0; }
 
         <div className="d-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, marginBottom: 32 }}>
           <div className="d-stats-card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>剩余电量</div>
-            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: '#1a1a1a', display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-tertiary)', marginBottom: 8 }}>剩余电量</div>
+            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'baseline', gap: 6 }}>
               {current?.surplus?.toFixed(1) ?? '--'}
-              <span style={{ fontSize: 16, fontWeight: 400, color: '#999' }}>kWh</span>
+              <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--text-tertiary)' }}>kWh</span>
             </div>
           </div>
           <div className="d-stats-card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>剩余余额</div>
-            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: '#1a1a1a' }}>
+            <div style={{ fontSize: 14, color: 'var(--text-tertiary)', marginBottom: 8 }}>剩余余额</div>
+            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: 'var(--text-primary)' }}>
               ¥{current?.amount?.toFixed(2) ?? '--'}
             </div>
           </div>
           <div className="d-stats-card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>今日用电</div>
-            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: '#1a1a1a', display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-tertiary)', marginBottom: 8 }}>今日用电</div>
+            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'baseline', gap: 6 }}>
               {todayUsage.toFixed(1)}
-              <span style={{ fontSize: 16, fontWeight: 400, color: '#999' }}>kWh</span>
+              <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--text-tertiary)' }}>kWh</span>
             </div>
           </div>
           <div className="d-stats-card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 14, color: '#999', marginBottom: 8 }}>今日电费</div>
-            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: '#1a1a1a' }}>
+            <div style={{ fontSize: 14, color: 'var(--text-tertiary)', marginBottom: 8 }}>今日电费</div>
+            <div className="d-stats-value" style={{ fontSize: 36, fontWeight: 700, color: 'var(--text-primary)' }}>
               ¥{todayCost.toFixed(2)}
             </div>
           </div>
@@ -381,15 +380,15 @@ body { margin: 0; }
 
         <div className="d-section-gap" style={{ marginBottom: 32 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
               <ChartLine theme="filled" size="20" fill="#4a90e2" style={{ display: 'flex' }} />
               今日用电趋势
-              <span style={{ fontSize: 13, color: '#999', fontWeight: 400 }}>(每时段)</span>
+              <span style={{ fontSize: 13, color: 'var(--text-tertiary)', fontWeight: 400 }}>(每时段)</span>
             </div>
           </div>
-          <div className="d-chart" style={{ position: 'relative', height: 280, background: '#fafbfc', borderRadius: 8, padding: 20 }}>
+          <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8, padding: 20 }}>
             {(!currentData?.todayRecords || currentData.todayRecords.length === 0) ? (
-              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: '#999' }}>暂无今日数据</div>
+              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: 'var(--text-tertiary)' }}>暂无今日数据</div>
             ) : null}
             <canvas ref={hourlyChartRef} />
           </div>
@@ -397,7 +396,7 @@ body { margin: 0; }
 
         <div className="d-section-gap" style={{ marginBottom: 32 }}>
           <div className="d-trend-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
               <ChartHistogram theme="filled" size="20" fill="#4a90e2" style={{ display: 'flex' }} />
               用电 & 剩余电量趋势
             </div>
@@ -409,8 +408,8 @@ body { margin: 0; }
                   style={{
                     padding: '8px 20px',
                     border: 'none',
-                    background: days === d ? '#333' : '#f0f2f5',
-                    color: days === d ? 'white' : '#666',
+                    background: days === d ? 'var(--tab-bg-active)' : 'var(--tab-bg)',
+                    color: days === d ? 'var(--tab-text-active)' : 'var(--tab-text)',
                     borderRadius: 20,
                     cursor: 'pointer',
                     fontSize: 14,
@@ -422,44 +421,44 @@ body { margin: 0; }
               ))}
             </div>
           </div>
-          <div className="d-chart" style={{ position: 'relative', height: 280, background: '#fafbfc', borderRadius: 8, padding: 20 }}>
+          <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8, padding: 20 }}>
             {(!historyData?.dailyRecords || historyData.dailyRecords.length === 0) ? (
-              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: '#999' }}>暂无历史数据</div>
+              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: 'var(--text-tertiary)' }}>暂无历史数据</div>
             ) : null}
             <canvas ref={trendChartRef} />
           </div>
         </div>
 
         <div className="d-bottom" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: '#f8f9fa', borderRadius: 8 }}>
-            <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: '#e8f4fd' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: 'var(--bg-item)', borderRadius: 8 }}>
+            <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'var(--bg-item-blue)' }}>
               <ChartHistogram theme="filled" size="22" fill="#4a90e2" style={{ display: 'flex' }} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, color: '#666', marginBottom: 2 }}>日均耗电</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 2 }}>日均耗电</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
                 {avgDaily != null ? `${avgDaily.toFixed(1)} kWh` : '--'}
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: '#f8f9fa', borderRadius: 8 }}>
-            <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: '#f0e8fd' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: 'var(--bg-item)', borderRadius: 8 }}>
+            <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'var(--bg-item-purple)' }}>
               <Lightning theme="filled" size="22" fill="#9b59b6" style={{ display: 'flex' }} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, color: '#666', marginBottom: 2 }}>平均功率</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>
-                {todayAvgPower != null ? `${(todayAvgPower * 1000).toFixed(0)} W` : '--'}
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 2 }}>平均功率</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
+                {avgPower != null ? `${(avgPower * 1000).toFixed(0)} W` : '--'}
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: '#f8f9fa', borderRadius: 8 }}>
-            <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: '#e8fdf4' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: 'var(--bg-item)', borderRadius: 8 }}>
+            <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'var(--bg-item-green)' }}>
               <Timer theme="filled" size="22" fill="#27ae60" style={{ display: 'flex' }} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, color: '#666', marginBottom: 2 }}>预计可用</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 2 }}>预计可用</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
                 {estimatedDays != null ? `${estimatedDays.toFixed(0)} 天` : '--'}
               </div>
             </div>
