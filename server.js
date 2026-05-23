@@ -54,10 +54,21 @@ if (!WECOM_WEBHOOK_URL) {
   console.warn('警告: 环境变量 WECOM_WEBHOOK_URL 未设置，企业微信通知功能将不可用');
 }
 
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+  console.log('Telegram 机器人通知已启用');
+} else if (TELEGRAM_BOT_TOKEN || TELEGRAM_CHAT_ID) {
+  console.warn('警告: 需要同时设置 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID 才能使用 Telegram 通知');
+} else {
+  console.log('Telegram 机器人通知未配置');
+}
+
 const ALERT_THRESHOLD = parseFloat(process.env.ALERT_THRESHOLD) || 0;
 
 if (ALERT_THRESHOLD > 0) {
-  console.log(`电费预警: 当余额低于 ¥${ALERT_THRESHOLD} 时将发送企业微信通知`);
+  console.log(`电费预警: 当余额低于 ¥${ALERT_THRESHOLD} 时将发送通知`);
 }
 
 let lastAlertedAmount = null;
@@ -97,6 +108,39 @@ async function sendWecomNotification(content) {
   } catch (err) {
     console.error('企业微信通知发送失败:', err.message);
   }
+}
+
+async function sendTelegramNotification(text) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+  const tgText = text
+    .replace(/^## (.+)$/gm, '*$1*')
+    .replace(/^> /gm, '')
+    .trim();
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: tgText,
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+      })
+    });
+    const body = await res.json();
+    if (!body.ok) {
+      console.error(`Telegram 通知发送失败: ${body.description}`);
+    }
+  } catch (err) {
+    console.error('Telegram 通知发送失败:', err.message);
+  }
+}
+
+async function sendAllNotifications(markdownContent, plainText) {
+  await Promise.all([
+    sendWecomNotification(markdownContent),
+    sendTelegramNotification(plainText || markdownContent),
+  ]);
 }
 
 function getLocalDateStr(d) {
@@ -156,7 +200,7 @@ async function collectData() {
   const data = await fetchData();
   if (!data) {
     console.log(`[${new Date().toLocaleString()}] 采集失败: 接口请求异常`);
-    await sendWecomNotification(
+    await sendAllNotifications(
       '## 电费采集异常\n\n' +
       `> 时间：${new Date().toLocaleString('zh-CN')}\n\n` +
       '电费接口请求失败，请检查网络或 Cookie 是否过期。'
@@ -189,7 +233,7 @@ async function checkThresholdAndAlert(amount) {
   if (lastAlertedAmount !== null && amount >= lastAlertedAmount) return;
   lastAlertedAmount = amount;
   console.log(`[预警] 余额 ¥${amount} 低于阈值 ¥${ALERT_THRESHOLD}`);
-  await sendWecomNotification(
+  await sendAllNotifications(
     '## 电费余额预警\n\n' +
     `> 时间：${new Date().toLocaleString('zh-CN')}\n\n` +
     `当前余额 **¥${amount.toFixed(2)}**\n\n` +
@@ -370,16 +414,15 @@ cron.schedule('0 * * * *', async () => {
 });
 
 async function sendDailyReport() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const dateStr = getLocalDateStr(yesterday);
+  const now = new Date();
+  const dateStr = getLocalDateStr(now);
 
   const records = getRecordsByDate(dateStr);
   if (records.length < 1) {
-    await sendWecomNotification(
+    await sendAllNotifications(
       '## 电费日报\n\n' +
       `> 日期：${dateStr}\n\n` +
-      `昨日无数据记录`
+      `今日无数据记录`
     );
     return;
   }
@@ -388,7 +431,7 @@ async function sendDailyReport() {
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
 
-  const dayBefore = new Date(yesterday);
+  const dayBefore = new Date(now);
   dayBefore.setDate(dayBefore.getDate() - 1);
   const dayBeforeRecords = getRecordsByDate(getLocalDateStr(dayBefore));
   const dayBeforeLast = dayBeforeRecords.length > 0 ? dayBeforeRecords[dayBeforeRecords.length - 1] : null;
@@ -399,14 +442,15 @@ async function sendDailyReport() {
   const cost = Math.round(Math.max(0, baseAmount - last.amount) * 100) / 100;
 
   const hoursSpan = (last.timestamp - first.timestamp) / (1000 * 60 * 60);
-  const avgPower = hoursSpan > 0 ? Math.round((usage / hoursSpan) * 1000) / 1000 : 0;
+  const reportHours = hoursSpan > 0 ? hoursSpan : Math.max(1, (Date.now() - first.timestamp) / 3600000);
+  const avgPower = Math.round((usage / reportHours) * 1000) / 1000;
 
   const latest = getLatestRecord();
 
   let content = '## 电费日报\n\n';
   content += `> 日期：${dateStr}\n\n`;
-  content += `**昨日用电**：${usage.toFixed(2)} 度\n`;
-  content += `**昨日电费**：¥${cost.toFixed(2)}\n`;
+  content += `**今日用电**：${usage.toFixed(2)} 度\n`;
+  content += `**今日电费**：¥${cost.toFixed(2)}\n`;
   content += `**平均功率**：${avgPower.toFixed(3)} kW\n`;
   content += `**数据记录**：${sorted.length} 条\n`;
   if (latest) {
@@ -414,11 +458,11 @@ async function sendDailyReport() {
     content += `**当前剩余余额**：¥${latest.amount.toFixed(2)}\n`;
   }
 
-  await sendWecomNotification(content);
+  await sendAllNotifications(content);
 }
 
-cron.schedule('0 0 * * *', async () => {
-  console.log(`[定时任务] 发送昨日用电报告...`);
+cron.schedule('30 23 * * *', async () => {
+  console.log(`[定时任务] 发送今日用电报告...`);
   await sendDailyReport();
 });
 
@@ -428,12 +472,17 @@ app.get('/api/trigger-collect', requireAuth, async (req, res) => {
 });
 
 app.get('/api/test-notify', requireAuth, async (req, res) => {
-  await sendWecomNotification(
+  await sendAllNotifications(
     '## 电费监控测试消息\n\n' +
     `> 时间：${new Date().toLocaleString('zh-CN')}\n\n` +
-    '如果收到此消息，说明企业微信通知配置正常。'
+    '如果收到此消息，说明推送通知配置正常。'
   );
-  res.json({ success: true, message: '测试消息已发送，请查看企业微信' });
+  res.json({ success: true, message: '测试消息已发送，请检查通知渠道' });
+});
+
+app.get('/api/send-report', requireAuth, async (req, res) => {
+  await sendDailyReport();
+  res.json({ success: true, message: '日报已发送' });
 });
 
 app.get('*', (req, res) => {

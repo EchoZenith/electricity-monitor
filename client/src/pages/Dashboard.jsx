@@ -86,7 +86,21 @@ export default function Dashboard({ onLogout }) {
       const res = await fetch('/api/test-notify');
       const data = await res.json();
       if (data.success) {
-        message.success('测试消息已发送，请查看企业微信');
+        message.success('测试消息已发送，请检查通知渠道');
+      } else {
+        message.error('发送失败');
+      }
+    } catch {
+      message.error('发送失败');
+    }
+  };
+
+  const handleSendReport = async () => {
+    try {
+      const res = await fetch('/api/send-report');
+      const data = await res.json();
+      if (data.success) {
+        message.success('日报已发送');
       } else {
         message.error('发送失败');
       }
@@ -332,6 +346,18 @@ body { margin: 0; }
               }}
             >
               测试通知
+            </Button>
+            <Button
+              onClick={handleSendReport}
+              size="small"
+              style={{
+                border: '1px solid var(--border-light)',
+                borderRadius: 20,
+                color: 'var(--text-secondary)',
+                fontSize: 13,
+              }}
+            >
+              发送日报
             </Button>
             <Button
               icon={<LogoutOutlined />}
