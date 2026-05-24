@@ -37,3 +37,9 @@ export async function triggerCollect() {
   if (res.status === 401) throw new Error('未登录');
   return res.json();
 }
+
+export async function fetchRecordsByDate(dateStr) {
+  const res = await fetch(`${BASE}/records-by-date?date=${dateStr}`);
+  if (res.status === 401) throw new Error('未登录');
+  return res.json();
+}

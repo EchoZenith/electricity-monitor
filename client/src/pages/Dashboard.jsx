@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Spin, message } from 'antd';
+import { Button, Spin, message, DatePicker } from 'antd';
 import { LogoutOutlined, ReloadOutlined, BugOutlined } from '@ant-design/icons';
 import { Lightning, ChartLine, ChartHistogram, Timer } from '@icon-park/react';
 import { Chart, registerables } from 'chart.js';
-import { fetchCurrent, fetchHistory, triggerCollect, logout } from '../api';
+import dayjs from 'dayjs';
+import { fetchCurrent, fetchHistory, triggerCollect, logout, fetchRecordsByDate } from '../api';
 
 Chart.register(...registerables);
 
@@ -34,6 +35,10 @@ export default function Dashboard({ onLogout }) {
   const [days, setDays] = useState(30);
   const [collecting, setCollecting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [chartDate, setChartDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [dateRecords, setDateRecords] = useState(null);
+  const [datePrevLast, setDatePrevLast] = useState(null);
+  const [isToday, setIsToday] = useState(true);
 
   const hourlyChartRef = useRef(null);
   const trendChartRef = useRef(null);
@@ -62,6 +67,17 @@ export default function Dashboard({ onLogout }) {
       trendInstance.current?.destroy();
     };
   }, [loadData]);
+
+  useEffect(() => {
+    const today = dayjs().format('YYYY-MM-DD');
+    setIsToday(chartDate === today);
+    fetchRecordsByDate(chartDate).then(data => {
+      if (data.success) {
+        setDateRecords(data.records);
+        setDatePrevLast(data.prevLastRecord);
+      }
+    });
+  }, [chartDate]);
 
   const handleCollect = async () => {
     setCollecting(true);
@@ -110,11 +126,12 @@ export default function Dashboard({ onLogout }) {
   };
 
   useEffect(() => {
-    if (!currentData?.todayRecords || currentData.todayRecords.length === 0) return;
+    const records = isToday ? currentData?.todayRecords : dateRecords;
+    const prev = isToday ? currentData?.yesterdayLastRecord : datePrevLast;
+    if (!records || records.length === 0) return;
     hourlyInstance.current?.destroy();
 
-    const sorted = [...currentData.todayRecords].sort((a, b) => a.timestamp - b.timestamp);
-    const prev = currentData.yesterdayLastRecord;
+    const sorted = [...records].sort((a, b) => a.timestamp - b.timestamp);
     const labels = sorted.map(r => formatTime(r.timestamp));
     const values = sorted.map((r, i) => {
       const prevRecord = i === 0 ? prev : sorted[i - 1];
@@ -179,7 +196,7 @@ export default function Dashboard({ onLogout }) {
         interaction: { intersect: false, mode: 'index' },
       },
     });
-  }, [currentData]);
+  }, [currentData, dateRecords, datePrevLast, isToday]);
 
   useEffect(() => {
     if (!historyData?.dailyRecords || historyData.dailyRecords.length === 0) return;
@@ -408,13 +425,20 @@ body { margin: 0; }
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
               <ChartLine theme="filled" size="20" fill="#4a90e2" style={{ display: 'flex' }} />
-              今日用电趋势
+              用电趋势
               <span style={{ fontSize: 13, color: 'var(--text-tertiary)', fontWeight: 400 }}>(每时段)</span>
             </div>
+            <DatePicker
+              value={dayjs(chartDate)}
+              onChange={(d) => d && setChartDate(d.format('YYYY-MM-DD'))}
+              allowClear={false}
+              size="small"
+              style={{ width: 130 }}
+            />
           </div>
           <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8, padding: 20 }}>
-            {(!currentData?.todayRecords || currentData.todayRecords.length === 0) ? (
-              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: 'var(--text-tertiary)' }}>暂无今日数据</div>
+            {(!isToday && (!dateRecords || dateRecords.length === 0)) || (isToday && (!currentData?.todayRecords || currentData.todayRecords.length === 0)) ? (
+              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: 'var(--text-tertiary)' }}>暂无数据</div>
             ) : null}
             <canvas ref={hourlyChartRef} />
           </div>

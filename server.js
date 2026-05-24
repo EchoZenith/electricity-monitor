@@ -353,6 +353,36 @@ app.get('/api/current', requireAuth, (req, res) => {
   });
 });
 
+app.get('/api/records-by-date', requireAuth, (req, res) => {
+  const dateStr = req.query.date;
+  if (!dateStr) return res.json({ success: false, message: '缺少 date 参数' });
+
+  const dayBefore = new Date(dateStr);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  const dayBeforeStr = getLocalDateStr(dayBefore);
+
+  const records = getRecordsByDate(dateStr);
+  const dayBeforeRecords = getRecordsByDate(dayBeforeStr);
+  const prevLast = dayBeforeRecords.length > 0 ? dayBeforeRecords[dayBeforeRecords.length - 1] : null;
+  const sorted = [...records].sort((a, b) => a.timestamp - b.timestamp);
+
+  let usage = 0;
+  let cost = 0;
+  if (sorted.length >= 1) {
+    const base = prevLast || sorted[0];
+    usage = Math.max(0, Math.round((base.surplus - sorted[sorted.length - 1].surplus) * 100) / 100);
+    cost = Math.max(0, Math.round((base.amount - sorted[sorted.length - 1].amount) * 100) / 100);
+  }
+
+  res.json({
+    success: true,
+    records: sorted,
+    prevLastRecord: prevLast,
+    usage,
+    cost,
+  });
+});
+
 app.get('/api/history', requireAuth, (req, res) => {
   const allRecords = getAllRecords();
   const { dailyRecords } = calculateDailyUsage(allRecords);
