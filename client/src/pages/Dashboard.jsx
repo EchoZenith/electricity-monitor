@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Spin, message, DatePicker } from 'antd';
-import { LogoutOutlined, ReloadOutlined, BugOutlined } from '@ant-design/icons';
+import { LogoutOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Lightning, ChartLine, ChartHistogram, Timer } from '@icon-park/react';
 import { Chart, registerables } from 'chart.js';
 import dayjs from 'dayjs';
@@ -106,20 +106,6 @@ export default function Dashboard({ onLogout }) {
   const handleLogout = async () => {
     await logout();
     onLogout();
-  };
-
-  const handleTestNotify = async () => {
-    try {
-      const res = await fetch('/api/test-notify');
-      const data = await res.json();
-      if (data.success) {
-        message.success('测试消息已发送，请检查通知渠道');
-      } else {
-        message.error('发送失败');
-      }
-    } catch {
-      message.error('发送失败');
-    }
   };
 
   const handleSendReport = async () => {
@@ -363,19 +349,6 @@ body { margin: 0; }
               手动获取
             </Button>
             <Button
-              icon={<BugOutlined />}
-              onClick={handleTestNotify}
-              size="small"
-              style={{
-                border: '1px solid var(--border-light)',
-                borderRadius: 20,
-                color: 'var(--text-secondary)',
-                fontSize: 13,
-              }}
-            >
-              测试通知
-            </Button>
-            <Button
               onClick={handleSendReport}
               size="small"
               style={{
@@ -450,7 +423,7 @@ body { margin: 0; }
           <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8 }}>
             {(!isToday && (!dateRecords || dateRecords.length === 0)) || (isToday && (!currentData?.todayRecords || currentData.todayRecords.length === 0)) ? (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>暂无数据</div>
-            ) : <div style={{ padding: 20, height: '100%' }}><canvas ref={hourlyChartRef} /></div>}
+            ) : <div style={{ padding: 20, height: '100%', boxSizing: 'border-box' }}><canvas ref={hourlyChartRef} /></div>}
           </div>
         </div>
 
@@ -484,7 +457,7 @@ body { margin: 0; }
           <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8 }}>
             {(!historyData?.dailyRecords || historyData.dailyRecords.length === 0) ? (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>暂无历史数据</div>
-            ) : <div style={{ padding: 20, height: '100%' }}><canvas ref={trendChartRef} /></div>}
+            ) : <div style={{ padding: 20, height: '100%', boxSizing: 'border-box' }}><canvas ref={trendChartRef} /></div>}
           </div>
         </div>
 

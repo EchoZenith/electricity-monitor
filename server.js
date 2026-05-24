@@ -136,10 +136,10 @@ async function sendTelegramNotification(text) {
   }
 }
 
-async function sendAllNotifications(markdownContent, plainText) {
+async function sendAllNotifications(markdownContent) {
   await Promise.all([
     sendWecomNotification(markdownContent),
-    sendTelegramNotification(plainText || markdownContent),
+    sendTelegramNotification(markdownContent),
   ]);
 }
 
@@ -242,7 +242,7 @@ async function checkThresholdAndAlert(amount) {
 }
 
 function calculateDailyUsage(records) {
-  if (records.length < 2) return { dailyUsage: 0, todayUsage: 0, todayCost: 0, dailyRecords: [] };
+  if (records.length < 2) return { dailyRecords: [] };
 
   const dailyMap = {};
 
@@ -282,7 +282,7 @@ function calculateDailyUsage(records) {
     prevLastSurplus = lastSurplus;
   }
 
-  return { dailyUsage: 0, todayUsage: 0, todayCost: 0, dailyRecords };
+  return { dailyRecords };
 }
 
 const CLIENT_DIR = path.join(__dirname, 'client', 'dist');
@@ -499,15 +499,6 @@ cron.schedule('30 23 * * *', async () => {
 app.get('/api/trigger-collect', requireAuth, async (req, res) => {
   await collectData();
   res.json({ success: true, message: '采集完成' });
-});
-
-app.get('/api/test-notify', requireAuth, async (req, res) => {
-  await sendAllNotifications(
-    '## 电费监控测试消息\n\n' +
-    `> 时间：${new Date().toLocaleString('zh-CN')}\n\n` +
-    '如果收到此消息，说明推送通知配置正常。'
-  );
-  res.json({ success: true, message: '测试消息已发送，请检查通知渠道' });
 });
 
 app.get('/api/send-report', requireAuth, async (req, res) => {
