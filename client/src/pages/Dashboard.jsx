@@ -15,9 +15,8 @@ const styles = `
   .d-stats-card { padding: 16px !important; }
   .d-stats-value { font-size: 28px !important; }
   .d-bottom { grid-template-columns: 1fr !important; gap: 12px !important; }
-  .d-chart { height: 200px !important; padding: 12px !important; }
-  .d-chart-empty { padding-top: 75px !important; }
-  .d-section-gap { margin-bottom: 24px !important; }
+  .d-chart { height: 200px !important; }
+   .d-section-gap { margin-bottom: 24px !important; }
   .d-container { padding: 16px !important; }
   .d-body { padding: 12px !important; }
   .d-trend-header { flex-direction: column !important; gap: 8px !important; }
@@ -45,6 +44,7 @@ export default function Dashboard({ onLogout }) {
   const hourlyInstance = useRef(null);
   const trendInstance = useRef(null);
   const intervalRef = useRef(null);
+  const chartContainerRef = useRef(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -67,6 +67,17 @@ export default function Dashboard({ onLogout }) {
       trendInstance.current?.destroy();
     };
   }, [loadData]);
+
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(() => {
+      hourlyInstance.current?.resize();
+      trendInstance.current?.resize();
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const today = dayjs().format('YYYY-MM-DD');
@@ -325,7 +336,7 @@ export default function Dashboard({ onLogout }) {
   const todayCost = currentData?.todayCost ?? 0;
 
   return (
-    <div className="d-body" style={{ background: 'var(--bg-body)', minHeight: '100vh', padding: 20 }}>
+    <div className="d-body" ref={chartContainerRef} style={{ background: 'var(--bg-body)', minHeight: '100vh', padding: 20 }}>
       <style>{`${styles}
 body { margin: 0; }
 .d-container { border-radius: 12px !important; box-shadow: none !important; }
@@ -436,11 +447,10 @@ body { margin: 0; }
               style={{ width: 130 }}
             />
           </div>
-          <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8, padding: 20 }}>
+          <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8 }}>
             {(!isToday && (!dateRecords || dateRecords.length === 0)) || (isToday && (!currentData?.todayRecords || currentData.todayRecords.length === 0)) ? (
-              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: 'var(--text-tertiary)' }}>暂无数据</div>
-            ) : null}
-            <canvas ref={hourlyChartRef} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>暂无数据</div>
+            ) : <div style={{ padding: 20, height: '100%' }}><canvas ref={hourlyChartRef} /></div>}
           </div>
         </div>
 
@@ -471,11 +481,10 @@ body { margin: 0; }
               ))}
             </div>
           </div>
-          <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8, padding: 20 }}>
+          <div className="d-chart" style={{ position: 'relative', height: 280, background: 'var(--bg-chart)', borderRadius: 8 }}>
             {(!historyData?.dailyRecords || historyData.dailyRecords.length === 0) ? (
-              <div className="d-chart-empty" style={{ textAlign: 'center', paddingTop: 110, color: 'var(--text-tertiary)' }}>暂无历史数据</div>
-            ) : null}
-            <canvas ref={trendChartRef} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>暂无历史数据</div>
+            ) : <div style={{ padding: 20, height: '100%' }}><canvas ref={trendChartRef} /></div>}
           </div>
         </div>
 
